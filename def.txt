@@ -1,0 +1,14 @@
+flex lexer.l
+bison -d parser.y
+gcc parser.tab.c lex.yy.c token.c symbol_table.c semantic.c -o compiler -lfl
+./compiler < input.txt
+
+
+
+
+bison -d parser.y
+flex lexer.l
+gcc -o dsl_compiler parser.tab.c lex.yy.c ast.c symbol_table.c semantic.c -lfl
+
+./dsl_compiler < input.txt
+

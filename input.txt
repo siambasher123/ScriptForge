@@ -1,0 +1,151 @@
+// ============================================
+// Goblin Entity Definition with Implicit Type Conversion
+// ============================================
+
+// Variable declarations with different types
+meter health_level = 100;        // Health points (0-100 scale)
+mood anger_meter = 5;            // Anger level (0-10 scale)
+energy speed_factor = 10;        // Movement speed multiplier
+int attack_power = 25;           // Integer type
+float damage_multiplier = 1.5;   // Float type
+bool is_angry = 0;               // Boolean type
+bool is_resting = 0;             // Boolean type
+int damage = 0;                  // Declared at global scope
+
+entity Goblin {
+    mode Idle {
+        // ========== IMPLICIT TYPE CONVERSION TESTS ==========
+        
+        // Test 1: int to float conversion (implicit)
+        print("=== Test 1: int to float conversion ===");
+        damage_multiplier = attack_power;
+        print(damage_multiplier);
+        
+        // Test 2: float to int conversion (with warning)
+        print("=== Test 2: float to int conversion (warning expected) ===");
+        attack_power = damage_multiplier;
+        print(attack_power);
+        
+        // Test 3: bool to int conversion
+        print("=== Test 3: bool to int conversion ===");
+        is_angry = 1;
+        attack_power = is_angry;
+        print(attack_power);
+        
+        // Test 4: int to bool conversion
+        print("=== Test 4: int to bool conversion ===");
+        is_resting = health_level;
+        print(is_resting);
+        
+        // Test 5: Mixed type comparison - int vs bool
+        print("=== Test 5: int vs bool comparison ===");
+        when health_level > is_angry -> Chase;
+        
+        // Test 6: Boolean in arithmetic expression
+        print("=== Test 6: Boolean in arithmetic ===");
+        health_level = health_level + is_angry;
+        print(health_level);
+        
+        // Test 7: Complex mixed expression
+        print("=== Test 7: Complex mixed expression ===");
+        speed_factor = health_level + is_angry * 2.5;
+        print(speed_factor);
+        
+        // Test 8: Comparison between different numeric types
+        print("=== Test 8: float vs int comparison ===");
+        when damage_multiplier > attack_power -> Retreat;
+        
+        // Test 9: Boolean in comparison with numeric
+        print("=== Test 9: Boolean in numeric comparison ===");
+        when is_angry == 1 -> Attack;
+        
+        // Test 10: Numeric in boolean expression
+        print("=== Test 10: Numeric in boolean condition ===");
+        when health_level -> Chase;
+        
+        // ========== ORIGINAL TRANSITIONS ==========
+        when see_player -> Chase;
+        
+        /* ORBIT LOOP: Runs 3 times */
+        orbit 3 {
+            unless low_health -> Escape;
+            health_level = health_level - is_resting;
+        }
+        
+        /* PULSE LOOP: Runs 2 times */
+        pulse 2 {
+            when anger_meter > 5 -> Attack;
+            damage_multiplier = anger_meter;
+            attack_power = damage_multiplier;
+        }
+        
+        /* BOUNCE LOOP: Runs 4 times */
+        bounce 4 {
+            ifnot tired -> Patrol;
+            is_resting = is_resting + 1;
+        }
+        
+        // Final output
+        print("=== Final Values ===");
+        print(health_level);
+        print(anger_meter);
+        print(speed_factor);
+        print(attack_power);
+        print(damage_multiplier);
+        print(is_angry);
+        print(is_resting);
+    }
+    
+    mode Chase {
+        print("=== Chase Mode ===");
+        print("Goblin is chasing the player!");
+        when low_health -> Escape;
+        when see_player == 0 -> Idle;
+        speed_factor = speed_factor + is_angry * 5;
+    }
+    
+    mode Attack {
+        print("=== Attack Mode ===");
+        print("Goblin attacks!");
+        
+        // Use global damage variable instead of declaring new one
+        damage = attack_power * damage_multiplier;
+        print(damage);
+        
+        is_angry = anger_meter > 5;
+        
+        when health_level < 20 -> Flee;
+        when see_player == 0 -> Idle;
+    }
+    
+    mode Escape {
+        print("=== Escape Mode ===");
+        print("Running away!");
+        speed_factor = speed_factor + (low_health * 10);
+        when low_health == 0 -> Idle;
+        when health_level > 80 -> Idle;
+    }
+    
+    mode Retreat {
+        print("=== Retreat Mode ===");
+        print("Retreating to heal!");
+        is_resting = 1;
+        when health_level > 80 -> Idle;
+        health_level = health_level + 10;
+    }
+    
+    mode Flee {
+        print("=== Flee Mode ===");
+        print("FLEEING!");
+        when health_level > 80 -> Idle;
+        when see_player == 0 -> Idle;
+    }
+    
+    mode Patrol {
+        print("=== Patrol Mode ===");
+        print("Patrolling area");
+        is_tired = speed_factor < 5;
+        when tired -> Idle;
+        when see_player -> Chase;
+    }
+}
