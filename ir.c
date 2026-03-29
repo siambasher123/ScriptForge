@@ -1,11 +1,171 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <regex.h>
 #include "ast.h"
 
 static int temp_counter = 0;
 static int label_counter = 0;
 static int loop_counter = 0;
+
+// Helper function to check if a string is a number
+static int is_number(const char* str) {
+    if (!str || *str == '\0') return 0;
+    
+    int has_dot = 0;
+    int i = 0;
+    
+    // Handle negative numbers
+    if (str[0] == '-') i = 1;
+    
+    for (; str[i] != '\0'; i++) {
+        if (isdigit(str[i])) continue;
+        if (str[i] == '.' && !has_dot) {
+            has_dot = 1;
+            continue;
+        }
+        return 0;
+    }
+    return i > (str[0] == '-' ? 1 : 0);
+}
+
+
+static char* fold_constants_in_expression(const char* expr) {
+    if (!expr || strlen(expr) == 0) return strdup(expr);
+    
+    // First, clean up unwanted characters (parentheses and semicolons)
+    char temp[256];
+    int j = 0;
+    for (int i = 0; expr[i] != '\0'; i++) {
+        char c = expr[i];
+        // Skip parentheses and semicolons
+        if (c == '(' || c == ')' || c == ';') {
+            continue;
+        }
+        temp[j++] = c;
+    }
+    temp[j] = '\0';
+    
+    char* result = malloc(256);
+    strcpy(result, temp);
+    
+    // Keep folding until no more improvements
+    int changed = 1;
+    while (changed) {
+        changed = 0;
+        char* ptr = result;
+        
+        // Look for patterns: number operator number
+        while (*ptr) {
+            // Skip whitespace
+            while (*ptr && isspace(*ptr)) ptr++;
+            
+            // Try to match: number op number
+            char* start = ptr;
+            char left_str[32] = {0};
+            char op[3] = {0};
+            char right_str[32] = {0};
+            
+            // Parse left number
+            int k = 0;
+            if (*ptr == '-' || *ptr == '+') {
+                left_str[k++] = *ptr++;
+            }
+            while (*ptr && isdigit(*ptr)) {
+                left_str[k++] = *ptr++;
+            }
+            if (*ptr == '.') {
+                left_str[k++] = *ptr++;
+                while (*ptr && isdigit(*ptr)) {
+                    left_str[k++] = *ptr++;
+                }
+            }
+            left_str[k] = '\0';
+            
+            if (is_number(left_str)) {
+                // Skip whitespace
+                while (*ptr && isspace(*ptr)) ptr++;
+                
+                // Parse operator
+                k = 0;
+                if (*ptr && strchr("+-*/%", *ptr)) {
+                    op[k++] = *ptr++;
+                    op[k] = '\0';
+                } else {
+                    ptr = start + 1;
+                    continue;
+                }
+                
+                // Skip whitespace
+                while (*ptr && isspace(*ptr)) ptr++;
+                
+                // Parse right number
+                k = 0;
+                if (*ptr == '-' || *ptr == '+') {
+                    right_str[k++] = *ptr++;
+                }
+                while (*ptr && isdigit(*ptr)) {
+                    right_str[k++] = *ptr++;
+                }
+                if (*ptr == '.') {
+                    right_str[k++] = *ptr++;
+                    while (*ptr && isdigit(*ptr)) {
+                        right_str[k++] = *ptr++;
+                    }
+                }
+                right_str[k] = '\0';
+                
+                if (is_number(right_str)) {
+                    // We have: number op number - fold them!
+                    float left = atof(left_str);
+                    float right = atof(right_str);
+                    float res = 0;
+                    int valid = 1;
+                    
+                    if (op[0] == '+') res = left + right;
+                    else if (op[0] == '-') res = left - right;
+                    else if (op[0] == '*') res = left * right;
+                    else if (op[0] == '/') {
+                        if (right != 0) res = left / right;
+                        else valid = 0;
+                    }
+                    else if (op[0] == '%') {
+                        res = (int)left % (int)right;
+                    }
+                    
+                    if (valid) {
+                        // Create the folded result
+                        char folded[32];
+                        if (res == (int)res) {
+                            sprintf(folded, "%.0f", res);
+                        } else {
+                            sprintf(folded, "%g", res);
+                        }
+                        
+                        // Rebuild the string with the folded result
+                        char new_result[256] = {0};
+                        strncat(new_result, result, start - result);
+                        strcat(new_result, folded);
+                        strcat(new_result, ptr);
+                        strcpy(result, new_result);
+                        
+                        changed = 1;
+                        ptr = result;
+                    } else {
+                        ptr = start + 1;
+                    }
+                } else {
+                    ptr = start + 1;
+                }
+            } else {
+                ptr = start + 1;
+            }
+        }
+    }
+    
+    return result;
+}
 
 static char* new_temp() {
     char* temp = malloc(32);
@@ -209,45 +369,68 @@ void generate_ir(ASTNode* node, FILE* out) {
 
 void optimize_ir(ASTNode* node) {
     if (!node) return;
-    
-    // Constant folding optimization
-    if (node->type == NODE_EXPR_OP) {
-        // Check if both operands are constants
-        if (node->children && node->children->type == NODE_EXPR_VAL &&
-            node->next && node->next->type == NODE_EXPR_VAL) {
-            
-            float left = atof(node->children->value);
-            float right = atof(node->next->value);
-            float result = 0;
-            
-            if (strcmp(node->name, "+") == 0) result = left + right;
-            else if (strcmp(node->name, "-") == 0) result = left - right;
-            else if (strcmp(node->name, "*") == 0) result = left * right;
-            else if (strcmp(node->name, "/") == 0) result = left / right;
-            else if (strcmp(node->name, ">") == 0) result = left > right;
-            else if (strcmp(node->name, "<") == 0) result = left < right;
-            else if (strcmp(node->name, "==") == 0) result = left == right;
-            else if (strcmp(node->name, "!=") == 0) result = left != right;
-            
-            // Replace with constant
-            char result_str[32];
-            if (strcmp(node->name, ">") == 0 || strcmp(node->name, "<") == 0 ||
-                strcmp(node->name, "==") == 0 || strcmp(node->name, "!=") == 0) {
-                sprintf(result_str, "%d", (int)result);
-            } else {
-                sprintf(result_str, "%g", result);
-            }
-            
-            node->type = NODE_EXPR_VAL;
-            if (node->value) free(node->value);
-            node->value = strdup(result_str);
-            free_ast(node->children);
-            free_ast(node->next);
-            node->children = NULL;
-            node->next = NULL;
+
+    // Recursively optimize children and next nodes first
+    optimize_ir(node->children);
+    optimize_ir(node->next);
+
+    // Optimize expressions in assignments
+    if (node->type == NODE_ASSIGN && node->value) {
+        char* optimized = fold_constants_in_expression(node->value);
+        if (strcmp(optimized, node->value) != 0) {
+            free(node->value);
+            node->value = optimized;
+        } else {
+            free(optimized);
         }
     }
     
-    optimize_ir(node->children);
-    optimize_ir(node->next);
+    // Optimize expressions in declarations
+    if (node->type == NODE_DECL && node->value) {
+        char* optimized = fold_constants_in_expression(node->value);
+        if (strcmp(optimized, node->value) != 0) {
+            free(node->value);
+            node->value = optimized;
+        } else {
+            free(optimized);
+        }
+    }
+
+    // Fold operator nodes (AST-level optimization)
+    if (node->type == NODE_EXPR_OP && node->children && node->children->type == NODE_EXPR_VAL) {
+        ASTNode* leftNode = node->children;
+        ASTNode* rightNode = leftNode->next; // Right operand is usually children->next
+
+        if (rightNode && rightNode->type == NODE_EXPR_VAL) {
+            float left = atof(leftNode->value);
+            float right = atof(rightNode->value);
+            float result = 0;
+
+            // Handle arithmetic
+            if (strcmp(node->name, "+") == 0) result = left + right;
+            else if (strcmp(node->name, "-") == 0) result = left - right;
+            else if (strcmp(node->name, "*") == 0) result = left * right;
+            else if (strcmp(node->name, "/") == 0 && right != 0) result = left / right;
+            else if (strcmp(node->name, "%") == 0 && right != 0) result = (int)left % (int)right;
+
+            // Convert result to string
+            char result_str[32];
+            if (result == (int)result) {
+                sprintf(result_str, "%.0f", result);
+            } else {
+                sprintf(result_str, "%g", result);
+            }
+
+            // Replace operator node with constant value
+            node->type = NODE_EXPR_VAL;
+            free(node->value);
+            node->value = strdup(result_str);
+
+            // Free old children nodes
+            free_ast(leftNode);
+            free_ast(rightNode);
+
+            node->children = NULL;
+        }
+    }
 }

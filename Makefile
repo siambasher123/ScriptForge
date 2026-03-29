@@ -22,7 +22,7 @@ lex.yy.c: lexer.l parser.tab.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f compiler parser.tab.c parser.tab.h parser.output lex.yy.c *.o output.cs output.ir
+	rm -f   compiler parser.tab.c parser.tab.h parser.output lex.yy.c *.o output.cs output.ir
 
 run: compiler
 	./compiler input.txt
@@ -36,3 +36,7 @@ run: compiler
 #       ./compiler_terminal.sh
 
 #            sed -i 's/\r$//' compiler_terminal.sh      bash compiler_terminal.sh
+
+
+#  git config --global user.name "siambasher123"
+#  git config --global user.email "siambasher0009@gmail.com"

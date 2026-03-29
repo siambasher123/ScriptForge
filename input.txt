@@ -11,43 +11,47 @@ entity Goblin {
         print("Goblin is Idle");
         print("Health: " + hp);
         print("Speed: " + spd);
+
+        // Single optimization example
+        x = 3 + 4;  
         
         // Simple state transitions
         when hp < 50 -> Retreat;
         when angry -> Attack;
-        
+
         // Simple loop
         orbit 2 {
             hp = hp - 5;
             print(hp);
         }
-        
+
         // Variable assignment
         dmg = 20;
         spd = spd + 1;
-        
+
         print("Final values:");
         print(hp);
         print(spd);
         print(dmg);
+        print(x); // Show optimized value
     }
-    
+
     mode Attack {
         print("Goblin Attacks!");
         dmg = dmg * 2;
         hp = hp - dmg;
         print("Damage: " + dmg);
         print("Health left: " + hp);
-        
+
         when hp < 30 -> Retreat;
         when hp > 80 -> Idle;
     }
-    
+
     mode Retreat {
         print("Goblin Retreats!");
         hp = hp + 20;
         print("Health restored: " + hp);
-        
+
         when hp > 70 -> Idle;
     }
 }
