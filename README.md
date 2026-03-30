@@ -37,6 +37,159 @@ Building smart game AI can be daunting, especially if you're not deeply familiar
 
 ---
 
+## Target Platforms & Tools
+
+| Component | Description |
+|-----------|-------------|
+| **Source Language** | Custom DSL for game character behavior |
+| **Target Language** | Unity C# (MonoBehaviour-based scripts) |
+| **Tools Used** | Flex (Lexer), Bison (Parser), C (Semantic analysis, IR generation, optimization, code generation) |
+
+---
+
+## Language Overview
+
+### Keywords
+
+| DSL Keyword | C#/Unity Equivalent | Description |
+|------------|-------------------|-------------|
+| `entity` | `class` | Defines a game character |
+| `state` / `mode` | `enum` / `case` | Defines behavior states |
+| `when` | `if` | Conditional state transition |
+| `unless` | `if not` | Transition if condition is false |
+| `ifnot` | `if not` | Alternative conditional |
+| `else` | `else` | Provides alternative behavior |
+| `print` | `Debug.Log()` | Output for debugging |
+| `return` | `return` | Function return |
+| `orbit` | loop | Circular orbit movement pattern |
+| `pulse` | loop | Rhythmic pulse/heartbeat pattern |
+| `bounce` | loop | Bouncing/oscillating pattern |
+| `repeat` | loop | Simple repeat count |
+| `while` | loop | Conditional loop |
+| `for` | loop | Iterator-based loop |
+
+### Identifiers
+
+| Feature | Rule | Example |
+|---------|------|---------|
+| **Character Name** | PascalCase | `Goblin`, `Boss` |
+| **State Name** | PascalCase | `Idle`, `Chase`, `Attack` |
+| **Enum Name** | PascalCase + State suffix | `GoblinState` |
+| **Condition / Flag** | snake_case | `see_player`, `low_health` |
+
+### Symbols and Operators
+
+| DSL Symbol | C#/Unity Equivalent | Description |
+|-----------|-------------------|-------------|
+| `{ }` | `{ }` | Block start/end |
+| `->` | assignment | State transition / variable assignment |
+| `=>` | lambda / assignment | Alternative transition operator |
+| `==`, `!=`, `>=`, `<=`, `>`, `<` | comparison | Conditional checks |
+| `+`, `-`, `*`, `/`, `%` | arithmetic operators | Math operations |
+| `&&`, `\|\|`, `!` | logical operators | Boolean operations |
+| `=` | assignment | Variable assignment |
+| `;` | `;` | Statement terminator |
+| `,` | `,` | Separator |
+| `:` | `:` | Declaration / mapping |
+| `( )` | `( )` | Expression grouping |
+| `[ ]` | `[ ]` | Array / indexing |
+
+### Built-in Boolean Variables
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `see_player` | bool | Whether character sees the player |
+| `low_health` | bool | Low health flag |
+| `tired` | bool | Tiredness flag |
+
+### Control Structures
+
+| DSL Construct | C#/Unity Equivalent | Description |
+|--------------|-------------------|-------------|
+| `state` / `mode` | `enum` + `switch` | Represents behavior states |
+| `when condition -> state` | `if` statement | Transition to another state |
+| `unless condition -> state` | `if not` | Transition if condition false |
+| `repeat`, `while`, `for` | Standard loops | Iterative control |
+| `print` | `Debug.Log()` | Debug output |
+| `return` | `return` | Exit function |
+
+---
+
+## Formal Grammar
+
+```
+program → entity_list
+entity_list → entity | entity_list entity
+entity → ENTITY ID { state_list }
+state_list → state | state_list state
+state → MODE ID { statement_list }
+statement_list → statement | statement_list statement
+statement → declaration | assignment | transition | if_statement | loop | print_statement | return
+declaration → type ID EQUALS expression SEMICOLON
+transition → WHEN ID ARROW ID SEMICOLON | UNLESS ID ARROW ID SEMICOLON
+if_statement → IF LPAREN condition RPAREN LBRACE statement_list RBRACE
+loop → LOOP_ORBIT INT LBRACE statement_list RBRACE | ...
+condition → expression | expression comp_op expression
+expression → int_val | ID | expression op expression | LPAREN expression RPAREN
+type → INT | FLOAT | BOOL | METER | MOOD | ENERGY | HEALTH | SPEED | POWER
+```
+
+---
+
+## Compiler Architecture
+
+### 1. Lexical Analysis (Flex)
+- Scans the DSL source and converts it into tokens
+- Recognizes keywords, identifiers, literals, operators, and symbols
+- Handles single-line (`//`) and multi-line (`/* ... */`) comments
+- Produces comprehensive error messages with line numbers
+
+### 2. Syntax Analysis (Bison)
+- Ensures token sequences follow the formal grammar rules
+- Builds an Abstract Syntax Tree (AST) representing the program structure
+- Provides detailed parse errors with line number information
+- Validates syntax before semantic analysis
+
+### 3. Abstract Syntax Tree (AST)
+- Each node represents program constructs: entities, states, transitions, expressions, loops, conditions
+- Supports tree traversal for semantic checks, IR generation, and code generation
+- 16 different node types for complete language representation
+
+### 4. Semantic Analysis
+- Ensures logical correctness of the program
+- Checks that all referenced states are properly defined
+- Prevents duplicate variable or state declarations
+- Performs type checking for assignments and operations
+- Detects undefined variables before code generation
+- Uses built-in variable pre-initialization for common AI conditions
+
+### 5. Symbol Table Management
+- Stores variable names, types (int, float, bool), and values
+- Supports symbol lookup, addition, and type compatibility checking
+- Tracks scope and manages built-in variables
+- Maximum capacity: 100 symbols per compilation
+
+### 6. Intermediate Representation (Three-Address Code)
+- Generates TAC (Three-Address Code) for each statement
+- Facilitates optimizations and simplifies final code generation
+- Supports temporary variables, labels, and jump statements
+- Creates `output.ir` file for debugging and analysis
+
+### 7. Code Optimization
+- **Constant Folding**: Computes expressions with literal operands at compile-time
+  - Example: `3 + 4` → `7` (no runtime computation needed)
+- Eliminates unnecessary operations and redundant code
+- Improves runtime performance by pre-computing static values
+
+### 8. Code Generation
+- Translates AST/IR into Unity C# code
+- Generates `MonoBehaviour` class for each entity
+- Creates `enum` representing all behavioral states
+- Implements `Update()` function with switch-case logic for state transitions
+- Produces readable, well-formatted, production-ready code
+
+---
+
 ## Language Syntax Examples
 
 **Variable Declarations**
